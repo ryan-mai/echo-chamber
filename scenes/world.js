@@ -1,3 +1,5 @@
+const { randInt } = require("three/src/math/MathUtils.js");
+
 function setWorld(worldState) {
     const leftHand = add([
         sprite('g-left'),
@@ -39,7 +41,7 @@ function setWorld(worldState) {
         sprite('rgb-right'),
         area(),
         body({isStatic: true}),
-        pos(745, 720 - 206),
+        pos(745, 720 - 209),
         scale(1.5),
         opacity(0),
         'rgb-right']);
@@ -47,7 +49,7 @@ function setWorld(worldState) {
         sprite('rgb-up'),
         area(),
         body({isStatic: true}),
-        pos(655, 720 - 206),
+        pos(655, 720 - 210),
         scale(1.5),
         opacity(0),
         'rgb-up']);
@@ -55,7 +57,7 @@ function setWorld(worldState) {
         sprite('rgb-down'),
         area(),
         body({isStatic: true}),
-        pos(565, 720 - 206),
+        pos(565, 720 - 209),
         scale(1.5),
         opacity(0),
         'rgb-down']);
@@ -86,6 +88,35 @@ function setWorld(worldState) {
             downRGB.opacity = 0;
         }
     });
+
+    const options = ['left','down','up','right'];
+
+    let spawnInterval = 1.4;
+    const MIN_SPAWN_INTERVAL = 0.45;
+    const SPEED_GROWTH_CAP = 400;
+    const SPEED_GROWTH_STEP = 40;
+
+    function getRandomInt(max) {
+        return Math.floor(Math.random() * max);
+    }
+
+    function spawnSignals() {
+        const index = getRandomInt(3);
+        const type = options[index];
+        const arrow = add([
+            sprite(`rgb-${type}`),
+            area(),
+            body({isStatic: false}),
+            pos(565, 720 - 600),
+            scale(1.5),
+            opacity(1),
+            `rgb-${type}`
+        ])
+        spawnInterval = Math.max(MIN_SPAWN_INTERVAL, spawnInterval - 0.02);
+        wait(rand(spawnInterval * 0.9, spawnInterval * 1.1), spawnSignals);     
+    }
+
+    wait(spawnInterval, spawnSignals());
 
     for (const key of Object.keys(keyDirMap)) {
         onKeyDown(key, () => {
