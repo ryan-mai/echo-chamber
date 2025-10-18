@@ -1,5 +1,3 @@
-const { randInt } = require("three/src/math/MathUtils.js");
-
 function setWorld(worldState) {
     const leftHand = add([
         sprite('g-left'),
@@ -90,33 +88,49 @@ function setWorld(worldState) {
     });
 
     const options = ['left','down','up','right'];
-
+    const xOptionPos = [475,565,655,745]
     let spawnInterval = 1.4;
     const MIN_SPAWN_INTERVAL = 0.45;
     const SPEED_GROWTH_CAP = 400;
     const SPEED_GROWTH_STEP = 40;
+    let fallSpeed = 220;
 
-    function getRandomInt(max) {
-        return Math.floor(Math.random() * max);
+    function getRandomInt(min = 0, max) {
+        const minCeil = Math.ceil(min);
+        const maxFloor = Math.floor(max)
+        return Math.floor(Math.random() * (maxFloor - minCeil) + minCeil);
     }
 
     function spawnSignals() {
-        const index = getRandomInt(3);
+        const index = getRandomInt(0, options.length);
         const type = options[index];
+        const xPos = xOptionPos[index];
         const arrow = add([
             sprite(`rgb-${type}`),
             area(),
-            body({isStatic: false}),
-            pos(565, 720 - 600),
+            pos(xPos, 720 - 600),
             scale(1.5),
-            opacity(1),
-            `rgb-${type}`
-        ])
+            { speed: fallSpeed },
+            'signal',
+        ]);
+
         spawnInterval = Math.max(MIN_SPAWN_INTERVAL, spawnInterval - 0.02);
-        wait(rand(spawnInterval * 0.9, spawnInterval * 1.1), spawnSignals);     
+        fallSpeed = Math.min(SPEED_GROWTH_CAP, fallSpeed + SPEED_GROWTH_STEP * 0.02);
+        wait(rand(spawnInterval * 0.9, spawnInterval * 1.1), spawnSignals);
     }
 
-    wait(spawnInterval, spawnSignals());
+    wait(spawnInterval, spawnSignals);
+
+    onUpdate('signal', (arrow) => {
+        arrow.move(0, arrow.speed);
+        if (arrow.pos.y > 720 + 64) {
+            destroy(arrow);
+        }
+    });
+    onCollide('signal', 'up', (signal, up) => {
+        debug.log(signal.pos.y);
+        destroy(signal)
+    });
 
     for (const key of Object.keys(keyDirMap)) {
         onKeyDown(key, () => {
