@@ -31,12 +31,45 @@ function setWorld(worldState) {
             segs.push(seg);
         }
 
+        const jitter = Array(SEGMENTS).fill(0);
+        let noiseTime = 0;
+        const SLOW_NOISE_MAG = 10;
+        const SPIKE_MAX_MAG = MAX_AMP * 2.0;
+        const MIN_SPIKE_GAP = 0.05;
+        const MAX_SPIKE_GAP = 1.0;
+        const MIN_SPIKE_WIDTH = 2;
+        const MAX_SPIKE_WIDTH = 6;
+
+        function addSpike(centerIndx, width, strength) {
+            const half = Math.floor(width / 2);
+            for (let i = centerIndx - half; i <= centerIndx + half; i++ ) {
+                if (i < 0 || i >= SEGMENTS) continue;
+
+                const w = 1 - (Math.abs(i - centerIndx) / (half || 1));
+                const target = strength * w;
+
+                tween(jitter[i], target, 0.08, (v) => (jitter[i] = v), easings.easeOutCirc);
+                wait(0.1, () => {
+                    tween(jitter[i], 0, 0.25, (v) => (jitter[i] = v), easings.easeInQuad);
+                });
+            }
+        }
+
+        function nextSpike() {
+            wait(rand(MIN_SPIKE_GAP, MAX_SPIKE_GAP), () => {
+                const center = Math.floor(rand(1, SEGMENTS - 1));
+                const width = Math.floor(rand(MIN_SPIKE_WIDTH, MAX_SPIKE_WIDTH + 1));
+                const strength = rand(-SPIKE_MAX_MAG, SPIKE_MAX_MAG);
+                addSpike(center, width, strength);
+                nextSpike();
+            });
+        }
         let lastSignal = -1;
         function retargetSignal() {
             const n = clamp01(signal / 100);
             const tAmp = MAX_AMP * easings.easeOutSine(n);
             const tCycles = lerp01(0.5, 6, easings.easeInCubic(n));
-            const tSpeed = lerp01(0.0, 10, easings.easeInOutSine(n));
+            const tSpeed = lerp01(5.0, 10, easings.easeInOutSine(n));
 
             tween(amp, tAmp, 0.45, (v) => (amp = v), easings.easeOutSine);
             tween(cycles, tCycles, 0.45, (v) => (cycles = v), easings.easeOutSine);
@@ -46,6 +79,8 @@ function setWorld(worldState) {
         retargetSignal();
         lastSignal = signal;
 
+        nextSpike();
+
         onUpdate(() => {
             if (signal !== lastSignal) {
                 retargetSignal();
@@ -53,10 +88,17 @@ function setWorld(worldState) {
             }
             
             phase += dt() * phaseSpeed;
+            noiseTime += dt();
 
             for (let i = 0; i < SEGMENTS; i++) {
                 const theta = (i / SEGMENTS) * Math.PI * 2 * cycles + phase;
-                const yOff = Math.sin(theta) * amp;
+                const base = Math.sin(theta) * amp;
+
+                const slowJitter = Math.sin(i * 0.55 + noiseTime * 0.8) * (SLOW_NOISE_MAG * 0.7) + Math.sin(i * 1.25 + noiseTime * 0.35 + 1.7) * (SLOW_NOISE_MAG * 0.3);
+                const spike = jitter[i];
+
+                let yOff = base + slowJitter + spike;
+                yOff = Math.max(-MAX_AMP, Math.min(MAX_AMP, yOff));
                 segs[i].pos.y = baseY + yOff - segHeight / 2;
                 segs[i].opacity = 1;
             }
@@ -75,6 +117,7 @@ function setWorld(worldState) {
     ]);
 
     const wave = signalWave(signalContainer, {width: 500, height: 50, segments: 48, segmentHeight: 6});
+
     function dropSignal() {
         const MAX_WIDTH = 500;
         const startPercent = (signalBar.width / MAX_WIDTH) * 100;
@@ -137,7 +180,7 @@ function setWorld(worldState) {
             signal -= 5;
             debug.log(signal);
             // dropSignal();
-        }, 5000);
+        }, 2000);
     }
     const startInterval = setInterval(() => {
         startText.timeLeft--;
@@ -330,41 +373,42 @@ function setWorld(worldState) {
     let songStartTime = null;
     let currentSong = null;
     let lastBeat = -1;
-    if (isStart) {
-    async function startSong(song) {
-        if (!song) return;
+    // async function startSong(song) {
+    //     if (!song) return;
 
-        // audio = new Audio(song.file);
-        // await audio.play();
-        songStartTime = performance.now() / 1000;
-        debug.log("What did I miss???")
+    //     // audio = new Audio(song.file);
+    //     // await audio.play();
+    //     songStartTime = performance.now() / 1000;
+    //     debug.log("What did I miss???")
 
-        currentSong = song;
-        const spawnY = 720 - 600;
-        const targetY = 720 - 200;
-        const travelTime = Math.abs(targetY - spawnY) / fallSpeed;
+    //     currentSong = song;
+    //     const spawnY = 720 - 600;
+    //     const targetY = 720 - 200;
+    //     const travelTime = Math.abs(targetY - spawnY) / fallSpeed;
 
-        for (const note of song.notes) {
-            const hitTime = beatsToSecond(note.beat, song.bpm, song.offset);
-            const spawnTime = hitTime - travelTime;
-            scheduleNote(note, spawnTime);
-        }
-    }
+    //     for (const note of song.notes) {
+    //         const hitTime = beatsToSecond(note.beat, song.bpm, song.offset);
+    //         const spawnTime = hitTime - travelTime;
+    //         scheduleNote(note, spawnTime);
+    //     }
+    // }
 
-    function scheduleNote(note, spawnTime) {
-        const delay = Math.max(0, (spawnTime - getSongTime()) * 1000);
-        setTimeout(() => {
-            spawnNoteAtLane(note.direction, note.lane, beatsToSecond(note.beat, currentSong.bpm, currentSong.offset))
-        }, delay);
-    }
+    // function scheduleNote(note, spawnTime) {
+    //     const delay = Math.max(0, (spawnTime - getSongTime()) * 1000);
+    //     setTimeout(() => {
+    //         spawnNoteAtLane(note.direction, note.lane, beatsToSecond(note.beat, currentSong.bpm, currentSong.offset))
+    //     }, delay);
+    // }
 
-    function getSongTime() {
-        return (performance.now()/ 1000) - songStartTime;
-    }
+    // function getSongTime() {
+    //     return (performance.now()/ 1000) - songStartTime;
+    // }
 
-    function spawnNoteAtLane(dir = 'up', lane, hitTime = null) {
-        const arrowType = dir || 'up';
-        const xPos = xOptionPos[lane] || xOptionPos[2];
+
+    function spawnNoteAtLane(hitTime = null) {
+        const index = getRandomInt(0, options.length);
+        const arrowType = options[index];
+        const xPos = xOptionPos[index];
         // debug.log(dir, lane);
         const arrow = add([
             sprite(`rgb-${arrowType}`),
@@ -382,12 +426,12 @@ function setWorld(worldState) {
             'signal',
         ]);
 
-        // spawnInterval = Math.max(MIN_SPAWN_INTERVAL, spawnInterval - 0.02);
-        // fallSpeed = Math.min(SPEED_GROWTH_CAP, fallSpeed + SPEED_GROWTH_STEP * 0.02);
-        // wait(rand(spawnInterval * 0.9, spawnInterval * 1.1), spawnNoteAtLane);
+        spawnInterval = Math.max(MIN_SPAWN_INTERVAL, spawnInterval - 0.02);
+        fallSpeed = Math.min(SPEED_GROWTH_CAP, fallSpeed + SPEED_GROWTH_STEP * 0.02);
+        wait(rand(spawnInterval * 0.9, spawnInterval * 1.1), spawnNoteAtLane);
     }
 
-    // wait(spawnInterval, spawnNoteAtLane);
+    wait(spawnInterval, spawnNoteAtLane);
     
     onUpdate('signal', (arrow) => {
         arrow.move(0, arrow.speed);
@@ -396,15 +440,15 @@ function setWorld(worldState) {
         }
     });
 
-    onUpdate(() => {
-        if (!currentSong) return;
-        const time = getSongTime();
-        const currentBeat = time / (60 / currentSong.bpm);
-        if (Math.floor(currentBeat !== lastBeat)) {
-            // debug.log(`Beat: ${Math.floor(currentBeat)}`);
-            lastBeat = Math.floor(currentBeat);
-        }
-    })
+    // onUpdate(() => {
+    //     if (!currentSong) return;
+    //     const time = getSongTime();
+    //     const currentBeat = time / (60 / currentSong.bpm);
+    //     if (Math.floor(currentBeat !== lastBeat)) {
+    //         // debug.log(`Beat: ${Math.floor(currentBeat)}`);
+    //         lastBeat = Math.floor(currentBeat);
+    //     }
+    // })
     onUpdate(() => {
         initialTime += dt();
         leftRGB.opacity = rightRGB.opacity = upRGB.opacity = downRGB.opacity = 0;
@@ -416,43 +460,44 @@ function setWorld(worldState) {
 
     let dirTime = 0
     const THRESHOLDS = {
-        perfect: 0.08,
-        great: 0.15,
-        good: 0.25,
+        perfect: 0.025,
+        great: 0.045,
+        good: 0.2,
         bad: 0.3,
         miss: 0.5,
     }
 
     for (const dir of options) {
-        onCollideUpdate('signal', dir, (signal, hand) => {
-            dirTime += dt();
-            if (activeDir === dir && signal.type === dir) {
-                let diff;
-                if (signal.hitTime != null) {
-                    diff = Math.abs(getSongTime() - signal.hitTime);
-                } else if (signal.spawnTime != null) {
-                    const spawnY = 720 - 600;
-                    const targetY = hand.pos.y;
-                    const estimatedTime = Math.abs(targetY - spawnY) / signal.speed;
-                    diff = Math.abs((signal.spawnTime + estimatedTime) - initialTime);
-                } else {
-                    diff = Math.abs(signal.pos.y - hand.pos.y) / signal.speed;
-                }
+        onCollideUpdate('signal', dir, (note, hand) => {
+            const currentTime = (songStartTime != null && currentSong)
+                ? ((performance.now() / 1000) - songStartTime)
+                : initialTime;
+            
+            if (activeDir !== dir || note.type !== dir) return
 
-                if (diff <= THRESHOLDS.perfect) {
-                    debug.log(`Perfect! - ${diff.toFixed(2)}s`);
-                } else if (diff <= THRESHOLDS.great) {
-                    debug.log('Great', diff.toFixed(3));
-                } else if (diff <= THRESHOLDS.good) {
-                    debug.log('Good', diff.toFixed(3));
-                } else if (diff <= THRESHOLDS.miss) {
-                    debug.log('Late/Early', diff.toFixed(3));
-                } else {
-                    debug.log('Miss', diff.toFixed(3));
-                }
+            const SPAWN_Y = 720 - 600;
+            const TARGET_Y= hand.pos.y;
+            let expectedTime;
 
-                destroy(signal);
+            if (typeof note.hitTime === 'number') {
+                expectedTime = note.hitTime;
+            } else if (typeof note.spawnTime === 'number') {
+                const travelTime = Math.abs(TARGET_Y - SPAWN_Y) / note.speed;
+                expectedTime = note.spawnTime + travelTime;
+            } else {
+                const travelTime = Math.abs(TARGET_Y - note.pos.y) / note.speed;
+                expectedTime = currentTime + travelTime;
             }
+
+            const diff = Math.abs(currentTime - expectedTime);
+
+            
+            if (diff <= THRESHOLDS.perfect && signal <= 97) signal += 3;
+            else if (diff <= THRESHOLDS.great && signal <= 98) signal += 2;
+            else if (diff <= THRESHOLDS.good && signal <= 99) signal += 1;
+            else signal--;
+
+            destroy(note);
         });
     }
     debug.inspect = true;
@@ -499,5 +544,4 @@ function setWorld(worldState) {
         });
     }
 
-    }
 }
