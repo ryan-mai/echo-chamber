@@ -1,4 +1,170 @@
 function setWorld(worldState) {
+    let signal = 100;
+    const signalContainer = add([
+        rect(500, 50, { radius: 8 }),
+        area(),
+        pos(40, 100),
+        color(200, 0, 0),
+        fixed()
+    ]);
+
+    const signalBar = signalContainer.add([
+        rect(500, 50, { radius: 8 }),
+        color(0, 180, 0),
+        pos(0, 0),
+        rotate(0),
+        fixed()
+    ]);
+
+    function dropSignal() {
+        const MAX_WIDTH = 500;
+        const startPercent = (signalBar.width / MAX_WIDTH) * 100;
+        tween(startPercent, signal, 1, (val) => {
+            signalBar.width = (MAX_WIDTH * val) / 100;
+        }, easings.easeOutSine);
+    }
+
+
+    const counter = add([
+        rect(100, 100, { radius: 8 }),
+        pos(center().x, center().y - 300),
+        color(10, 10, 10),
+        area(),
+        anchor("center"),
+        layer('ui'),
+        fixed()
+    ]);
+
+    const count = counter.add([
+        text('60'),
+        area(),
+        anchor('center'),
+        { timeLeft: 61 },
+        layer('ui'),
+        fixed()
+    ]);
+
+    const startCount = add([
+        rect(100, 100),
+        pos(center().x, center().y),
+        area(),
+        opacity(0),
+        anchor("center"),
+        fixed()
+    ]);
+
+    const startText = startCount.add([
+        text('3'),
+        scale(3),
+        color(255, 65, 65),
+        area(),
+        anchor('center'),
+        { timeLeft: 4 },
+        fixed()
+    ]);
+    let isStart = false;
+
+    let countdownInterval = null;
+    
+    function startCounter() {
+        if (countdownInterval) return;
+        countdownInterval = setInterval(() => {
+            if (signal === 0) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+                gameOver = true
+                return
+            }
+            signal -= 5;
+            debug.log(signal);
+            dropSignal();
+        }, 5000);
+    }
+    const startInterval = setInterval(() => {
+        startText.timeLeft--;
+        if (startText.timeLeft === 0) {
+            startText.text = 'GO TEXT!';
+        } else if (startText.timeLeft < 0) {
+            isStart = true;
+            clearInterval(startInterval);
+            destroy(startCount);
+            startCounter();
+            return;
+        } else {
+            startText.text = String(startText.timeLeft);
+        }
+    }, 1000);
+
+    const chatboxContainer = add([
+        rect(650, 550, { radius: 8 }),
+        area(),
+        pos(720 - 125, 100),
+        color(0, 0, 0),
+        layer('ui'),
+        opacity(0),
+        fixed()
+    ]);
+
+    function getResolvedSize(ent) {
+        const spr = ent.sprite;
+        const sprW = spr?.width ?? spr?.frameWidth ?? null;
+        const sprH = spr?.height ?? spr?.frameHeight ?? null;
+        const sc = (typeof ent.scale === 'number') ? { x: ent.scale, y: ent.scale } : (ent.scale ?? { x: 1, y: 1 });
+        const scaleX = sc.x ?? 1;
+        const scaleY = sc.y ?? sc.x ?? 1;
+        const w = (sprW != null) ? sprW * scaleX : (ent.width ?? 0);
+        const h = (sprH != null) ? sprH * scaleY : (ent.height ?? 0);
+        return { w, h };
+    }
+
+    const rightFrame = chatboxContainer.add([
+        sprite("bubble-right-100"),
+        scale(1),
+        fixed()
+    ]);
+
+    const rightText = rightFrame.add([
+        text('Child, you better explain yourself!', {
+            font: 'sf',
+            align: "left",
+        }),
+        anchor("center"),
+        scale(0.65),
+        pos(0, 0),
+    ]);
+
+    wait(0, () => {
+        const { w, h } = getResolvedSize(rightFrame);
+        rightText.pos = vec2(w / 2, h / 2);
+    });
+
+    function messageMom() {
+        if (!selectedChoice) return;
+
+        let frame = chatboxContainer.add([
+            rect(498, 65, { radius: 8 }),
+            color(0, 180, 0),
+            pos(190, 100),
+            layer('ui'),
+            fixed()
+        ]);
+        let message = frame.add([
+            text('...', {
+                align: "left",
+            }),
+            anchor("center"),
+            scale(0.8),
+            pos(498 / 2, 65 / 2),  
+        ]);
+        if (selectedChoice === 1) {
+            message.text = 'Ok I will when I get home...'
+        } else if (selectedChoice === 2) {
+            message.text = 'Mom, you\'re being overdramatic!'
+        } else {
+            message.text = 'What do you mean?';
+        }
+    }
+
     let initialTime = 0;
     let songJSON = null;
     fetch('/songs.json')
@@ -21,7 +187,7 @@ function setWorld(worldState) {
             offset: vec2(15, 5),
         }),
         body({isStatic: true}),
-        pos(475, 720 - 200),
+        pos(175, 720 - 200),
         scale(1.5),
         'left']);
     const rightHand = add([
@@ -31,7 +197,7 @@ function setWorld(worldState) {
             offset: vec2(15, 5),
         }),
         body({isStatic: true}),
-        pos(745, 720 - 200),
+        pos(445, 720 - 200),
         scale(1.5),
         'right']);
     const upHand = add([
@@ -41,7 +207,7 @@ function setWorld(worldState) {
             offset: vec2(15, 5),
         }),
         body({isStatic: true}),
-        pos(655, 720 - 200),
+        pos(355, 720 - 200),
         scale(1.5),
         'up']);
     const downHand = add([
@@ -51,50 +217,40 @@ function setWorld(worldState) {
             offset: vec2(15, 5),
         }),
         body({isStatic: true}),
-        pos(565, 720 - 200),
+        pos(265, 720 - 200),
         scale(1.5),
         'down']);
     const leftRGB = add([
         sprite('rgb-left'),
         body({isStatic: true}),
-        pos(475, 720 - 206),
+        pos(175, 720 - 206),
         scale(1.5),
         opacity(0),
         'rgb-left']);
     const rightRGB = add([
         sprite('rgb-right'),
         body({isStatic: true}),
-        pos(745, 720 - 209),
+        pos(445, 720 - 209),
         scale(1.5),
         opacity(0),
         'rgb-right']);
     const upRGB = add([
         sprite('rgb-up'),
         body({isStatic: true}),
-        pos(655, 720 - 210),
+        pos(355, 720 - 210),
         scale(1.5),
         opacity(0),
         'rgb-up']);
     const downRGB = add([
         sprite('rgb-down'),
         body({isStatic: true}),
-        pos(565, 720 - 209),
+        pos(265, 720 - 209),
         scale(1.5),
         opacity(0),
         'rgb-down']);
 
-    const keyDirMap = {
-        up: 'up', w: 'up',
-        down: 'down', s: 'down',
-        left: 'left', a: 'left',
-        right: 'right', d: 'right',
-    }
-
-    let activeDir = null;
-
-
     const options = ['left','down','up','right'];
-    const xOptionPos = [475,565,655,745]
+    const xOptionPos = [175,265,355,445]
     let spawnInterval = 1.4;
     const MIN_SPAWN_INTERVAL = 0.45;
     const SPEED_GROWTH_CAP = 400;
@@ -111,32 +267,46 @@ function setWorld(worldState) {
         return Math.floor(Math.random() * (maxFloor - minCeil) + minCeil);
     }
 
+    let audio = null
+    let songStartTime = null;
+    let currentSong = null;
+    let lastBeat = -1;
+    if (isStart) {
     async function startSong(song) {
         if (!song) return;
 
-        audio = new Audio(song.file);
-        await audio.play();
+        // audio = new Audio(song.file);
+        // await audio.play();
         songStartTime = performance.now() / 1000;
         debug.log("What did I miss???")
+
+        currentSong = song;
         const spawnY = 720 - 600;
         const targetY = 720 - 200;
         const travelTime = Math.abs(targetY - spawnY) / fallSpeed;
 
         for (const note of song.notes) {
             const hitTime = beatsToSecond(note.beat, song.bpm, song.offset);
-            const spawnPos = Math.max(0, hitTime - travelTime);
-            const delay = Math.max(0, spawnPos * 1000);
-
-            setTimeout(() => {
-                spawnNoteAtLane(note.direction, note.lane, hitTime);
-            }, delay);
+            const spawnTime = hitTime - travelTime;
+            scheduleNote(note, spawnTime);
         }
+    }
+
+    function scheduleNote(note, spawnTime) {
+        const delay = Math.max(0, (spawnTime - getSongTime()) * 1000);
+        setTimeout(() => {
+            spawnNoteAtLane(note.direction, note.lane, beatsToSecond(note.beat, currentSong.bpm, currentSong.offset))
+        }, delay);
+    }
+
+    function getSongTime() {
+        return (performance.now()/ 1000) - songStartTime;
     }
 
     function spawnNoteAtLane(dir = 'up', lane, hitTime = null) {
         const arrowType = dir || 'up';
         const xPos = xOptionPos[lane] || xOptionPos[2];
-        debug.log(dir, lane);
+        // debug.log(dir, lane);
         const arrow = add([
             sprite(`rgb-${arrowType}`),
             area({
@@ -159,7 +329,7 @@ function setWorld(worldState) {
     }
 
     // wait(spawnInterval, spawnNoteAtLane);
-
+    
     onUpdate('signal', (arrow) => {
         arrow.move(0, arrow.speed);
         if (arrow.pos.y > 720) {
@@ -167,6 +337,15 @@ function setWorld(worldState) {
         }
     });
 
+    onUpdate(() => {
+        if (!currentSong) return;
+        const time = getSongTime();
+        const currentBeat = time / (60 / currentSong.bpm);
+        if (Math.floor(currentBeat !== lastBeat)) {
+            // debug.log(`Beat: ${Math.floor(currentBeat)}`);
+            lastBeat = Math.floor(currentBeat);
+        }
+    })
     onUpdate(() => {
         initialTime += dt();
         leftRGB.opacity = rightRGB.opacity = upRGB.opacity = downRGB.opacity = 0;
@@ -191,7 +370,7 @@ function setWorld(worldState) {
             if (activeDir === dir && signal.type === dir) {
                 let diff;
                 if (signal.hitTime != null) {
-                    diff = Math.abs(initialTime - signal.hitTime);
+                    diff = Math.abs(getSongTime() - signal.hitTime);
                 } else if (signal.spawnTime != null) {
                     const spawnY = 720 - 600;
                     const targetY = hand.pos.y;
@@ -218,6 +397,23 @@ function setWorld(worldState) {
         });
     }
     debug.inspect = true;
+
+    const keyDirMap = {
+        up: 'up', w: 'up',
+        down: 'down', s: 'down',
+        left: 'left', a: 'left',
+        right: 'right', d: 'right',
+    }
+
+    const messageMap = {
+        1: 1,
+        2: 2,
+        3: 3,
+    }
+
+    let activeDir = null;
+    let selectedChoice = null;
+
     for (const key of Object.keys(keyDirMap)) {
         onKeyDown(key, () => {
             if (activeDir) return;
@@ -228,5 +424,21 @@ function setWorld(worldState) {
                 activeDir = null;
             }
         });
+    }
+
+    for (const key of Object.keys(messageMap)) {
+        debug.log(key)
+        onKeyDown(key, () => {
+            if (selectedChoice) return;
+            selectedChoice = messageMap[key];
+            messageMom();
+        });
+        onKeyRelease(key, () => {
+            if (messageMap[key] === selectedChoice) {
+                selectedChoice = null;
+            }
+        });
+    }
+
     }
 }
