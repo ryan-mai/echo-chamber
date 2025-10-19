@@ -1,4 +1,19 @@
 function setWorld(worldState) {
+    let initialTime = 0;
+    let songJSON = null;
+    fetch('/songs.json')
+        .then((res) => {
+            if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+            return res.json();
+        })
+        .then((data) => {
+            songJSON = data;
+            // debug.log(`Songs loaded: ${JSON.stringify(songJSON[0], null, 2)}`);
+            startSong(songJSON[0])
+        })
+        .catch((err) => {
+            debug.log(`Failed to load: ${err}`);
+        })
     const leftHand = add([
         sprite('g-left'),
         area({
@@ -86,16 +101,42 @@ function setWorld(worldState) {
     const SPEED_GROWTH_STEP = 40;
     let fallSpeed = 220;
 
+    function beatsToSecond(beat, bpm, offset) {
+        return beat * (60.0 / bpm) + offset;
+    }
+    
     function getRandomInt(min = 0, max) {
         const minCeil = Math.ceil(min);
         const maxFloor = Math.floor(max)
         return Math.floor(Math.random() * (maxFloor - minCeil) + minCeil);
     }
 
-    function spawnSignals() {
-        const index = getRandomInt(0, options.length);
-        const arrowType = options[index];
-        const xPos = xOptionPos[index];
+    async function startSong(song) {
+        if (!song) return;
+
+        audio = new Audio(song.file);
+        await audio.play();
+        songStartTime = performance.now() / 1000;
+        debug.log("What did I miss???")
+        const spawnY = 720 - 600;
+        const targetY = 720 - 200;
+        const travelTime = Math.abs(targetY - spawnY) / fallSpeed;
+
+        for (const note of song.notes) {
+            const hitTime = beatsToSecond(note.beat, song.bpm, song.offset);
+            const spawnPos = Math.max(0, hitTime - travelTime);
+            const delay = Math.max(0, spawnPos * 1000);
+
+            setTimeout(() => {
+                spawnNoteAtLane(note.direction, note.lane, hitTime);
+            }, delay);
+        }
+    }
+
+    function spawnNoteAtLane(dir = 'up', lane, hitTime = null) {
+        const arrowType = dir || 'up';
+        const xPos = xOptionPos[lane] || xOptionPos[2];
+        debug.log(dir, lane);
         const arrow = add([
             sprite(`rgb-${arrowType}`),
             area({
@@ -106,16 +147,18 @@ function setWorld(worldState) {
             scale(1.5),
             {   speed: fallSpeed,
                 type: arrowType,
+                spawnTime: initialTime,
+                hitTime: hitTime,
              },
             'signal',
         ]);
 
-        spawnInterval = Math.max(MIN_SPAWN_INTERVAL, spawnInterval - 0.02);
-        fallSpeed = Math.min(SPEED_GROWTH_CAP, fallSpeed + SPEED_GROWTH_STEP * 0.02);
-        wait(rand(spawnInterval * 0.9, spawnInterval * 1.1), spawnSignals);
+        // spawnInterval = Math.max(MIN_SPAWN_INTERVAL, spawnInterval - 0.02);
+        // fallSpeed = Math.min(SPEED_GROWTH_CAP, fallSpeed + SPEED_GROWTH_STEP * 0.02);
+        // wait(rand(spawnInterval * 0.9, spawnInterval * 1.1), spawnNoteAtLane);
     }
 
-    wait(spawnInterval, spawnSignals);
+    // wait(spawnInterval, spawnNoteAtLane);
 
     onUpdate('signal', (arrow) => {
         arrow.move(0, arrow.speed);
@@ -125,6 +168,7 @@ function setWorld(worldState) {
     });
 
     onUpdate(() => {
+        initialTime += dt();
         leftRGB.opacity = rightRGB.opacity = upRGB.opacity = downRGB.opacity = 0;
         if (activeDir === 'left') leftRGB.opacity = 1;
         else if (activeDir === 'right') rightRGB.opacity = 1;
@@ -133,23 +177,43 @@ function setWorld(worldState) {
     });
 
     let dirTime = 0
-    const perfectTime = 0.72;
-    const okTime = perfectTime - 20 || perfectTime + 20;
-    const goodTime = perfectTime - 15 || perfectTime + 15;
-    const greatTime = perfectTime - 10 || perfectTime + 10;
+    const THRESHOLDS = {
+        perfect: 0.08,
+        great: 0.15,
+        good: 0.25,
+        bad: 0.3,
+        miss: 0.5,
+    }
 
     for (const dir of options) {
         onCollideUpdate('signal', dir, (signal, hand) => {
             dirTime += dt();
             if (activeDir === dir && signal.type === dir) {
-                let roundedTime = dirTime.toFixed(2);
-                if (roundedTime === perfectTime){
-                    debug.log('Perfect!', roundedTime);
+                let diff;
+                if (signal.hitTime != null) {
+                    diff = Math.abs(initialTime - signal.hitTime);
+                } else if (signal.spawnTime != null) {
+                    const spawnY = 720 - 600;
+                    const targetY = hand.pos.y;
+                    const estimatedTime = Math.abs(targetY - spawnY) / signal.speed;
+                    diff = Math.abs((signal.spawnTime + estimatedTime) - initialTime);
                 } else {
-                    debug.log('Meh...', roundedTime);
+                    diff = Math.abs(signal.pos.y - hand.pos.y) / signal.speed;
                 }
+
+                if (diff <= THRESHOLDS.perfect) {
+                    debug.log(`Perfect! - ${diff.toFixed(2)}s`);
+                } else if (diff <= THRESHOLDS.great) {
+                    debug.log('Great', diff.toFixed(3));
+                } else if (diff <= THRESHOLDS.good) {
+                    debug.log('Good', diff.toFixed(3));
+                } else if (diff <= THRESHOLDS.miss) {
+                    debug.log('Late/Early', diff.toFixed(3));
+                } else {
+                    debug.log('Miss', diff.toFixed(3));
+                }
+
                 destroy(signal);
-                dirTime = 0;
             }
         });
     }

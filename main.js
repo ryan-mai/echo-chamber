@@ -9,6 +9,14 @@ setBackground(Color.fromHex('#36A6E0'))
 
 loadAssets();
 
+// const player = new Tone.Player(
+// 	'./assets/what-did-i.mp3'
+// ).toDestination();
+// Tone.loaded().then(() => {
+// 	player.start();
+// });
+
+
 document.addEventListener('DOMContentLoaded', () => {
     Object.assign(document.body.style, {
         display: 'flex',

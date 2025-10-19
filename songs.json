@@ -1,0 +1,39 @@
+[
+  {
+    "title": "What did I Miss?",
+    "artist": "Drake",
+    "bpm": 126,
+    "offset": 0.2,
+    "length": 314,
+    "notes": [
+      { "beat": 8, "direction": "up", "lane": 2 },
+      { "beat": 8.5, "direction": "left", "lane": 0 },
+      { "beat": 9, "direction": "right", "lane": 3 }
+    ],
+    "file": "../assets/what-did-i.mp3"
+  },
+  {
+    "title": "We Are Young",
+    "artist": "fun. (feat. Janelle Monáe)",
+    "bpm": 184,
+    "offset": 0.2,
+    "length": 251,
+    "notes": [
+      { "beat": 8, "direction": "up", "lane": 2 },
+      { "beat": 8.5, "direction": "left", "lane": 0 },
+      { "beat": 9, "direction": "right", "lane": 3 }
+    ]
+  },
+  {
+    "title": "Wake Me Up",
+    "artist": "Avicii",
+    "bpm": 124,
+    "offset": 0.15,
+    "length": 247,
+    "notes": [
+      { "beat": 4, "direction": "down", "lane": 1 },
+      { "beat": 4.5, "direction": "left", "lane": 0 },
+      { "beat": 6, "direction": "right", "lane": 3 }
+    ]
+  }
+]
