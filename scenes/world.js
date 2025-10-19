@@ -1,21 +1,80 @@
 function setWorld(worldState) {
     let signal = 100;
+
+
+    function signalWave(container, opts = {}) {
+        const width = opts.width ?? 500;
+        const height = opts.height ?? 50;
+        const SEGMENTS = opts.segments ?? 80;
+        const segWidth = width / SEGMENTS;
+        const segHeight = opts.segmentHeight ?? 6;
+        const baseY = (height / 2);
+        const segs = [];
+
+        const clamp01 = (n) => Math.max(0, Math.min(1, n));
+        const lerp01 = (a, b, t) => a + (b - a) * t;
+        let phase = 0;
+        let amp = 0;
+        let cycles = 0.5;
+        let phaseSpeed = 0;
+
+        const MAX_AMP = (height / 2) - segHeight;
+
+        for (let i = 0; i < SEGMENTS; i++) {
+            const seg = container.add([
+                rect(segWidth - 1, segHeight, {radius: 0}),
+                pos(i * segWidth, baseY - segHeight / 2),
+                color(0, 200, 0),
+                anchor('left'),
+                fixed()
+            ]);
+            segs.push(seg);
+        }
+
+        let lastSignal = -1;
+        function retargetSignal() {
+            const n = clamp01(signal / 100);
+            const tAmp = MAX_AMP * easings.easeOutSine(n);
+            const tCycles = lerp01(0.5, 6, easings.easeInCubic(n));
+            const tSpeed = lerp01(0.0, 10, easings.easeInOutSine(n));
+
+            tween(amp, tAmp, 0.45, (v) => (amp = v), easings.easeOutSine);
+            tween(cycles, tCycles, 0.45, (v) => (cycles = v), easings.easeOutSine);
+            tween(phaseSpeed, tSpeed, 0.45, (v) => (phaseSpeed = v), easings.easeOutSine);
+        }
+
+        retargetSignal();
+        lastSignal = signal;
+
+        onUpdate(() => {
+            if (signal !== lastSignal) {
+                retargetSignal();
+                lastSignal = signal;
+            }
+            
+            phase += dt() * phaseSpeed;
+
+            for (let i = 0; i < SEGMENTS; i++) {
+                const theta = (i / SEGMENTS) * Math.PI * 2 * cycles + phase;
+                const yOff = Math.sin(theta) * amp;
+                segs[i].pos.y = baseY + yOff - segHeight / 2;
+                segs[i].opacity = 1;
+            }
+        });
+
+        return {segs};
+    }
+
     const signalContainer = add([
         rect(500, 50, { radius: 8 }),
         area(),
         pos(40, 100),
+        opacity(0),
         color(200, 0, 0),
         fixed()
     ]);
 
-    const signalBar = signalContainer.add([
-        rect(500, 50, { radius: 8 }),
-        color(0, 180, 0),
-        pos(0, 0),
-        rotate(0),
-        fixed()
-    ]);
-
+    const wave = signalWave(signalContainer, {width: 500, height: 50, segments: 48, segmentHeight: 6});
     function dropSignal() {
         const MAX_WIDTH = 500;
         const startPercent = (signalBar.width / MAX_WIDTH) * 100;
@@ -77,7 +136,7 @@ function setWorld(worldState) {
             }
             signal -= 5;
             debug.log(signal);
-            dropSignal();
+            // dropSignal();
         }, 5000);
     }
     const startInterval = setInterval(() => {
