@@ -127,25 +127,6 @@ function setWorld(worldState) {
     }
 
 
-    const counter = add([
-        rect(100, 100, { radius: 8 }),
-        pos(center().x, center().y - 300),
-        color(10, 10, 10),
-        area(),
-        anchor("center"),
-        layer('ui'),
-        fixed()
-    ]);
-
-    const count = counter.add([
-        text('60'),
-        area(),
-        anchor('center'),
-        { timeLeft: 61 },
-        layer('ui'),
-        fixed()
-    ]);
-
     const startCount = add([
         rect(100, 100),
         pos(center().x, center().y),
@@ -156,7 +137,9 @@ function setWorld(worldState) {
     ]);
 
     const startText = startCount.add([
-        text('3'),
+        text('3', {
+            font: 'sf'
+        }),
         scale(3),
         color(255, 65, 65),
         area(),
@@ -185,7 +168,7 @@ function setWorld(worldState) {
     const startInterval = setInterval(() => {
         startText.timeLeft--;
         if (startText.timeLeft === 0) {
-            startText.text = 'GO TEXT!';
+            startText.text = 'MESSAGE HER!';
         } else if (startText.timeLeft < 0) {
             isStart = true;
             clearInterval(startInterval);
@@ -198,12 +181,11 @@ function setWorld(worldState) {
     }, 1000);
 
     const chatboxContainer = add([
-        rect(650, 550, { radius: 8 }),
+        sprite('phone'),
         area(),
-        pos(720 - 125, 100),
-        color(0, 0, 0),
-        layer('ui'),
-        opacity(0),
+        scale(1.5),
+        pos(720 - 150, 50),
+        opacity(1),
         fixed()
     ]);
 
@@ -221,7 +203,8 @@ function setWorld(worldState) {
 
     const rightFrame = chatboxContainer.add([
         sprite("bubble-right-100"),
-        scale(1),
+        scale(0.65),
+        pos(30, 150),
         fixed()
     ]);
 
@@ -234,6 +217,13 @@ function setWorld(worldState) {
         scale(0.65),
         pos(0, 0),
     ]);
+
+    // const optFrame = chatboxContainer.add([
+    //     sprite('options'),
+    //     scale(1),
+    //     pos(15, chatboxContainer.pos.y + 150),
+    //     fixed(),
+    // ])
 
     wait(0, () => {
         const { w, h } = getResolvedSize(rightFrame);
@@ -529,6 +519,51 @@ function setWorld(worldState) {
             }
         });
     }
+
+    onUpdate(() => setCursor("default"));
+
+    function addButton(
+        p = vec2(200, 100),
+        f = () => debug.log("hello"),
+    ) {
+        const btn = chatboxContainer.add([
+            rect(247, 40, {radius: 4}),
+            pos(p),
+            area(),
+            scale(1),
+            anchor("center"),
+            outline(0),
+            color(255, 255, 255),
+        ]);
+
+        btn.add([
+            anchor("center"),
+            color(0, 0, 0),
+        ]);
+
+
+        btn.onHoverUpdate(() => {
+            const t = time() * 10;
+            btn.color = hsl2rgb((t / 10) % 1, 0.6, 0.7);
+            btn.scale = vec2(1.05);
+            setCursor("pointer");
+        });
+
+        btn.onHoverEnd(() => {
+            btn.scale = vec2(1);
+            btn.color = rgb();
+        });
+
+        btn.onClick(f);
+
+        return btn;
+    }
+
+    addButton(vec2(172, 278 - 46), () => selectedChoice = 0);
+    addButton(vec2(172, 278), () => selectedChoice = 1);
+    addButton(vec2(172, 278 + 45), () => selectedChoice = 2);
+    addButton(vec2(172, 278 + 45 * 2), () => selectedChoice = 3);
+    // addButton(vec2(200, 200), () => selectedChoice = 1);
 
     for (const key of Object.keys(messageMap)) {
         debug.log(key)

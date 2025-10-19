@@ -12,6 +12,7 @@ function loadAssets() {
     loadSprite('bubble-right-100', "./assets/bubble_right_1_100.svg");
     loadSprite('bubble-right-75', "./assets/bubble_right_1_75.svg");
     loadSprite('bubble-right-50', "./assets/bubble_right_1_50.svg");
-
+    loadSprite('phone', './assets/phone.svg');
+    loadSprite('options', './assets/option.svg')
     loadFont('sf', './fonts/sf-compact-display-reg.ttf');
     }
