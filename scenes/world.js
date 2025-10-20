@@ -2,6 +2,46 @@ function setWorld(worldState) {
     let signal = 100;
 
 
+    const DIALOGUE = {
+        apologize: {
+            best: ["I'm sorry...I know I'm in the wrong."],
+            good: ["I messed up :("],
+            neutral: ["Can we talk about this later?"],
+            bad: ["Bro, your doing too much"],
+            noop: ["..."]
+        },
+        deflect: {
+            best: ["Mom, it was all a confusion"],
+            good: ["It was a misunderstanding."],
+            neutral: ["Really why now?"],
+            bad: ["It's all the teacher's fault!!!"],
+            noop: ["..."]
+        },
+        joke: {
+            best: ["Mom! I'll be aware that being honest is also graded"],
+            good: ["Bad joke, good lesson."],
+            neutral: ["I was going to make a joke..."],
+            bad: ["Mom, the cheat sheet was open source ;)"],
+            noop: ["[Insert meme]"]
+        },
+        stall: {
+            best: ["I'm on the subway. I'll call you when I get home"],
+            good: ["Wait, my teacher is not online right now!"],
+            neutral: ["Can we talk later?"],
+            bad: ["You are embarassing me in front of my friends bruh..."],
+            noop: ["..."]
+        }
+    };
+
+    const MOM_REPLIES = {
+        best: ["Ok. I am expecting the best of you!"],
+        good: ["I better hear good things when you get come"],
+        neutral: ["We'll talk later."],
+        bad: ["Unacceptable."],
+        noop: ["Are you avoiding me?"]
+    };
+
+    function clamp(value, low = 0, high = 1) { return Math.max(low, Math.min(high, value))}
     function signalWave(container, opts = {}) {
         const width = opts.width ?? 500;
         const height = opts.height ?? 50;
@@ -481,7 +521,13 @@ function setWorld(worldState) {
 
             const diff = Math.abs(currentTime - expectedTime);
 
-            
+            let judge = 'miss';
+            if (diff <= THRESHOLDS.perfect) judge = 'perfect';
+            else if (diff <= THRESHOLDS.great) judge = 'great';
+            else if (diff <= THRESHOLDS.good) judge = 'good';
+            else if (diff <= THRESHOLDS.bad) judge = 'bad';
+            recordLastHits(judge);
+
             if (diff <= THRESHOLDS.perfect && signal <= 97) signal += 3;
             else if (diff <= THRESHOLDS.great && signal <= 98) signal += 2;
             else if (diff <= THRESHOLDS.good && signal <= 99) signal += 1;
@@ -524,6 +570,7 @@ function setWorld(worldState) {
 
     function addButton(
         p = vec2(200, 100),
+        label = 'Option ???',
         f = () => debug.log("hello"),
     ) {
         const btn = chatboxContainer.add([
@@ -537,6 +584,10 @@ function setWorld(worldState) {
         ]);
 
         btn.add([
+            text(label, {
+                font: 'sf',
+                size: 18
+            }),
             anchor("center"),
             color(0, 0, 0),
         ]);
@@ -554,29 +605,222 @@ function setWorld(worldState) {
             btn.color = rgb();
         });
 
-        btn.onClick(f);
+        btn.onClick(() => {
+            if (!isStart) return;
+            f();
+        });
 
         return btn;
     }
 
-    addButton(vec2(172, 278 - 46), () => selectedChoice = 0);
-    addButton(vec2(172, 278), () => selectedChoice = 1);
-    addButton(vec2(172, 278 + 45), () => selectedChoice = 2);
-    addButton(vec2(172, 278 + 45 * 2), () => selectedChoice = 3);
-    // addButton(vec2(200, 200), () => selectedChoice = 1);
+    addButton(vec2(172, 278 - 46), 'Apologize', () => sendMsg('apologize'));
+    addButton(vec2(172, 278), 'Deflect', () => sendMsg('deflect'));
+    addButton(vec2(172, 278 + 45), 'Joke', () => sendMsg('joke'));
+    addButton(vec2(172, 278 + 45 * 2), 'Stall', () => sendMsg('stall'));
+   
+    const topicMap = {
+        '1': 'apologize',
+        '2': 'deflect',
+        '3': 'joke',
+        '4': 'stall',
+    }
 
-    for (const key of Object.keys(messageMap)) {
+    function norm01(n, low = 0, high = 100) {return clamp((n - low) / (high - low), 0, 1);}
+
+    const lastHits = [];
+    const scoreValues = {
+        perfect: 1.0,
+        great: 0.7,
+        good: 0.4,
+        bad: 0.2,
+        miss: 0.0
+    }
+
+    function recordLastHits(value) {
+        lastHits.push(value)
+        if (lastHits.length > 3) lastHits.shift();
+    }
+
+    function perfectThree() {
+        return lastHits.length === 3 && lastHits.every(val => val === 'perfect');
+    }
+
+    function averageHits() {
+        if (lastHits.length === 0) return 0;
+        const sum = lastHits.reduce((s, j) => s + (scoreValues[j] ?? 0), 0);
+        return sum / lastHits.length;
+    }   
+
+    function weighted(weights) {
+        let prob = rand(0, 1);
+        for (const [key, value] of Object.entries(weights)) {
+            if (prob <= value) return key;
+            prob -= value;
+        }
+
+        const keys = Object.keys(weights);
+        return keys[keys.length - 1];
+    }
+
+    function bestOdds() {
+        if (perfectThree()) {
+            return (signal < 30) ? 0.4 : 0.9;
+        }
+        const signalFactor = 0.45 * norm01(signal);
+        const hitFactor = 0.45 * averageHits();
+        return clamp(signalFactor + hitFactor, 0, 0.9);
+    }
+
+    function chooseResponse() {
+        const probBest = bestOdds();
+        const probAvg = averageHits();
+        const signalNormal = norm01(signal);
+
+        const probGood = 0.25 * probAvg + 0.05;
+        const probNeutral = 0.18;
+        const probNoop = 0.05 + 0.15 * (1 - signalNormal);
+
+        let remainder = 1 - (probBest + probGood + probNeutral + probNoop);
+        const probBad = clamp(remainder, 0.05, 1);
+
+        const sum = probBest + probGood + probNeutral + probNoop + probBad;
+        const weights = {
+            best: probBest / sum,
+            good: probGood / sum,
+            neutral: probNeutral / sum,
+            noop: probNoop / sum,
+            bad: probBad / sum,
+        }
+        return weighted(weights);
+    }
+
+    let susValue = 0;
+    function addSuspicion(val) {
+        susValue = clamp(susValue + val, 0, 100);
+    }
+
+    function delaySend() {
+        const time = norm01(signal);
+        return lerp(0.25, 2.5, 1 - time) + rand(0, 0.35);
+    }
+
+    let nextMsgY = 100;
+    function placeRightY() {
+        const y = nextMsgY;
+        nextMsgY += 74;
+        return y;
+    }
+
+    function placeLeft() {
+        const y = nextMsgY;
+        nextMsgY += 74;
+        return y;
+    }
+
+    function addLeft(msg = '...') {
+        const y = placeLeft();
+        const frame = chatboxContainer.add([
+            rect(498, 65, {radius: 8}),
+            color(0, 180, 0),
+            pos(190, y),
+            fixed()
+        ]);
+
+        const message = frame.add([
+            text(msg, {align: 'left'}),
+            anchor('center'),
+            scale(0.8),
+            pos(498 / 2, 65 / 2),
+        ]);
+        return {frame, message};
+    }
+
+    function addRight(msg) {
+        const y = placeRightY();
+        const frame = chatboxContainer.add([
+            sprite('bubble-right-100'),
+            scale(0.65),
+            pos(30, y),
+            fixed()
+        ]);
+        wait(0, () => {
+            const spr = frame.sprite;
+            const w = (spr?.width ?? spr?.frameWidth ?? 300) * (frame.scale?.x ?? 0.65);
+            const h = (spr?.height ?? spr?.frameHeight ?? 100) * (frame.scale?.y ?? 0.65);
+            const message = frame.add([
+                text(msg, {
+                    font: 'sf',
+                    align: 'left'
+                }),
+                anchor('center'),
+                scale(0.65),
+                pos(w / 2, h / 2),
+            ]);
+        });
+    }
+
+    function chooseOption(arr) {
+        return arr[Math.floor(rand(0, arr.length))];
+    }
+
+    function chooseDialogue(topic, category) {
+        const options = DIALOGUE[topic]?.[category];
+        if (options && options.length > 0) return chooseOption(options);
+        const fallbackOpt = Object.values(DIALOGUE[topic] ?? {}).flat();
+        return fallbackOpt.length ? chooseOption(fallbackOpt) : '(...)';
+    }
+
+    function chooseMomReply(category) {
+        const options = MOM_REPLIES[category] ?? MOM_RELIES.neutral;
+        return chooseOption(options);
+    }
+
+    let isSending = false;
+
+    function sendMsg(topic) {
+        if (isSending) return;
+        isSending = true;
+
+        const category = chooseResponse();
+        const playerMsg = chooseDialogue(topic, category);
+
+        const sending = addLeft('typing...');
+        const delay = delaySend();
+
+        addSuspicion(delay * 4.67);
+        
+        wait(delay, () => {
+            sending.message.text = playerMsg;
+
+            if (category === 'best') signal = clamp(signal + 3, 0, 100);
+            else if (category === 'good') signal = clamp(signal + 1, 0, 100);
+            else if (category === 'bad') signal = clamp(signal - 2, 0, 100);
+            else if (category === 'noop') signal = clamp(signal - 1, 0, 100);
+        
+            wait(rand(0.25, 0.7), () => {
+                const reply = chooseMomReply(category);
+                addRight(reply);
+
+                if (category === 'bad') addSuspicion(10);
+                else if (category === 'noop') addSuspicion(6);
+                else if (category === 'best') addSuspicion(-5);
+
+                isSending = false;
+            });
+        });
+    }
+
+    for (const key of Object.keys(topicMap)) {
         debug.log(key)
         onKeyDown(key, () => {
-            if (selectedChoice) return;
-            selectedChoice = messageMap[key];
-            messageMom();
+            if (!isStart || isSending) return;
+            sendMsg(topicMap[key])
         });
-        onKeyRelease(key, () => {
-            if (messageMap[key] === selectedChoice) {
-                selectedChoice = null;
-            }
-        });
+        // onKeyRelease(key, () => {
+        //     if (messageMap[key] === topicMap) {
+        //         messageMap = null;
+        //     }
+        // });
     }
 
 }
